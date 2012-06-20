@@ -4,17 +4,19 @@ import matplotlib.pyplot as plt
 from heuristics import cut_biggest
 
 from mean_nn import mean_nn
-#from plot_clustering import plot_clustering, plot_edge_coloring
 from plot_clustering import plot_clustering
-#from information_theoretic_clustering import graph_to_indicator
 from tree_entropy import tree_information
-from sklearn.metrics import adjusted_rand_score, \
-        adjusted_mutual_info_score, normalized_mutual_info_score
+from sklearn.metrics import adjusted_rand_score, adjusted_mutual_info_score
+
+normalized_mutual_info_score = lambda x, y: np.NaN
+try:
+    from sklearn.metrics import normalized_mutual_info_score
+except ImportError:
+    pass
+
 from sklearn.cluster import KMeans
 
-#from mst_split_test import mst_multi_split, mst_multi_split_expansion
-from mst_split_test import mst_multi_split
-np
+from itm import itm
 
 from IPython.core.debugger import Tracer
 tracer = Tracer()
@@ -46,7 +48,7 @@ def do_experiments(dataset, plot, three_d=False):
     informations = []
     functions = []
     names = []
-    functions = [mst_multi_split, cut_biggest]
+    functions = [itm, cut_biggest]
     names = ["MST multi cut", "cut biggest"]
     X_plot = X
     for i, method in enumerate(zip(functions, names)):
@@ -57,16 +59,15 @@ def do_experiments(dataset, plot, three_d=False):
         y_ = st_
 
         if plot:
-            this_plot = fig.add_subplot(1, len(names) + 2, i + 1)
-            this_plot = plot_clustering(X_plot, y_, this_plot, three_d=three_d)
-            this_plot.set_title("%-15s ARI %.3f, AMI: %.3f, NMI: %.3f obj: %.2f"
+            ax = fig.add_subplot(1, len(names) + 2, i + 1)
+            ax = plot_clustering(X_plot, y_, ax, three_d=three_d)
+            ax.set_title("%-15s ARI %.3f, AMI: %.3f, NMI: %.3f obj: %.2f"
                     % (name, adjusted_rand_score(y, y_),
                         adjusted_mutual_info_score(y, y_),
                         normalized_mutual_info_score(y, y_), i_))
         print("%-15s ARI: %.3f, AMI: %.3f, NMI: %.3f objective: %.3f" % (name,
             adjusted_rand_score(y, y_), adjusted_mutual_info_score(y, y_),
             normalized_mutual_info_score(y, y_), i_))
-        #print(np.bincount(y_))
     kmeans = KMeans(k=n_cluster, n_init=1).fit(X)
     kmeans_ARI = adjusted_rand_score(y, kmeans.labels_)
     kmeans_AMI = adjusted_mutual_info_score(y, kmeans.labels_)

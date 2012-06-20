@@ -1,65 +1,12 @@
 from scipy import sparse
 from tree_entropy import mst_dual_boruvka, tree_information_sparse
-#import mst_split
-
-from IPython.core.debugger import Tracer
-tracer = Tracer()
-
-import matplotlib.pyplot as plt
-from plot_clustering import plot_clustering
 
 import numpy as np
 DTYPE = np.float
 ITYPE = np.int
 
 
-def mst_multi_split_expansion(X, n_cluster=2, return_everything=False):
-    # init:
-    n_samples, n_features = X.shape
-    forest, removed_edges = mst_multi_split(X, n_cluster=n_cluster,
-            return_everything=True)
-    old_objective = -np.inf
-    new_objective = tree_information_sparse(forest, n_features)
-    iteration = 0
-    while old_objective < new_objective:
-        print("iteration %d" % iteration)
-        old_objective = new_objective
-        new_removed_edges = []
-        for edge in removed_edges:
-            plot_clustering(X, forest=forest)
-            plt.savefig("blub_%d" % iteration)
-            plt.close()
-            n_cluster_, y = sparse.cs_graph_components(forest + forest.T)
-            assert(n_cluster_ == n_cluster)
-            comps = y[edge[0]]
-            mask = np.where((y == comps[0]) + (y == comps[1]))[0]
-            component = forest[mask[:, np.newaxis], mask]
-            # place of matrix entry corresponding to edge in
-            # the submatrix correstponding to the component
-            mapped_edge = [int(np.where(mask == e)[0]) for e in edge[0]]
-            component[mapped_edge[0], mapped_edge[1]] = edge[1]
-            graph, objective, removed_edge = mst_split_test(component,
-                    n_features, return_edge=True)
-            mapped_re = [mask[removed_edge[0]], mask[removed_edge[1]]]
-            if (np.asarray(edge[0]) == mapped_re).all():
-                new_removed_edges.append(edge)
-            else:
-                print("replaced %s by %s" % (edge[0], mapped_re))
-                forest[edge[0][0], edge[0][1]] = edge[1]
-                new_removed_edges.append([mapped_re, removed_edge[2]])
-                forest[mapped_re[0], mapped_re[1]] = 0
-
-        new_objective = tree_information_sparse(forest, n_features)
-        removed_edges = new_removed_edges
-        iteration += 1
-
-    if return_everything:
-        return forest, removed_edges
-
-    return y, tree_information_sparse(forest, n_features) / n_samples
-
-
-def mst_multi_split(X, n_cluster=2, return_everything=False):
+def itm(X, n_cluster=2, return_everything=False):
     """Recursively splits dataset into two cluster.
     Finds best cluster to split based on increase of objective."""
 
@@ -70,7 +17,7 @@ def mst_multi_split(X, n_cluster=2, return_everything=False):
     forest = sparse.coo_matrix((weights, (edges[:, 0], edges[:, 1])),
             shape=(n_samples, n_samples)).tocsr()
     clusters = [(forest, np.arange(n_samples))]
-    cut_improvement = [mst_split_test(forest.copy(), n_features,
+    cut_improvement = [itm_binary(forest.copy(), n_features,
         return_edge=True)]
     # init cluster_infos to anything.
     # doesn't matter any way as there is only one component
@@ -90,14 +37,18 @@ def mst_multi_split(X, n_cluster=2, return_everything=False):
         _, old_inds = clusters.pop(i_to_split)
         removed_edges.append((old_inds[list(edge[:2])], edge[2]))
 
-        n_split_components, split_components_indicator = sparse.cs_graph_components(split + split.T)
+        n_split_components, split_components_indicator = \
+            sparse.cs_graph_components(split + split.T)
         assert(n_split_components == 2)
 
         for i in xrange(n_split_components):
             inds = np.where(split_components_indicator == i)[0]
             clusters.append((split[inds[np.newaxis, :], inds], old_inds[inds]))
-            cluster_infos.append(tree_information_sparse(clusters[-1][0], n_features))
-            cut_improvement.append(mst_split_test(clusters[-1][0].copy(), n_features, return_edge=True))
+            mi = tree_information_sparse(clusters[-1][0], n_features)
+            cluster_infos.append(mi)
+            imp = itm_binary(clusters[-1][0].copy(), n_features,
+                    return_edge=True)
+            cut_improvement.append(imp)
 
     # correspondence of nodes to datapoints not present in sparse matrices
     # but we saved the indices.
@@ -116,7 +67,7 @@ def mst_multi_split(X, n_cluster=2, return_everything=False):
     return y, tree_information_sparse(result, n_features) / n_samples
 
 
-def mst_split_test(graph, n_features, return_edge=False):
+def itm_binary(graph, n_features, return_edge=False):
     """ calculate split criterion for all edges
     using "message passing" style algorithm to sum edges
     and count nodes in subtrees. "up" is the root, "down" the leaves."""
@@ -165,14 +116,15 @@ def mst_split_test(graph, n_features, return_edge=False):
     visited = np.zeros(n_samples, dtype=np.bool)
     incoming_down = np.zeros(graph_sym.shape[0])
 
-    #root to leave pass 
+    #root to leave pass
     while to_visit:
         x = to_visit.pop()
         visited[x] = True
-        for i in xrange(indptr[x], indptr[x+1]):
+        for i in xrange(indptr[x], indptr[x + 1]):
             n = neighbors[i]
             if n != parent[x]:
-                incoming_down[n] += incoming_down[x] + distances[i] + incoming_up_accumulated[x] - incoming_up[x, n]
+                incoming_down[n] += (incoming_down[x] + distances[i] +
+                        incoming_up_accumulated[x] - incoming_up[x, n])
                 parent[n] = x
                 to_visit.append(n)
 
@@ -184,11 +136,12 @@ def mst_split_test(graph, n_features, return_edge=False):
             continue
         p = parent[x]
         # sum in parent part:
-        p_weights = float(incoming_down[p] + incoming_up_accumulated[p] - incoming_up_accumulated[x] - graph_sym[x, p])
+        p_weights = float(incoming_down[p] + incoming_up_accumulated[p] -
+                incoming_up_accumulated[x] - graph_sym[x, p])
         # sum in child part:
         c_weights = float(incoming_up_accumulated[x])
         # nodes in child part:
-        c_nodes = nodes_below[x] + 1 # count self
+        c_nodes = nodes_below[x] + 1  # count self
         if c_nodes <= 1:
             # single node
             continue
@@ -197,10 +150,11 @@ def mst_split_test(graph, n_features, return_edge=False):
             # single node
             continue
 
-        if p_weights < 0:
-            tracer()
-        objective = p_nodes * ((n_features - 1) * np.log(p_nodes) - n_features * np.log(p_weights))
-        objective += c_nodes * ((n_features - 1) * np.log(c_nodes) - n_features * np.log(c_weights))
+        assert(p_weights > 0)
+        objective = (p_nodes * ((n_features - 1) * np.log(p_nodes)
+                    - n_features * np.log(p_weights)))
+        objective += (c_nodes * ((n_features - 1) * np.log(c_nodes)
+                    - n_features * np.log(c_weights)))
         if objective > best_objective:
             best_cut = x
             best_objective = objective
