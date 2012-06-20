@@ -7,8 +7,28 @@ ITYPE = np.int
 
 
 def itm(X, n_cluster=2, return_everything=False):
-    """Recursively splits dataset into two cluster.
-    Finds best cluster to split based on increase of objective."""
+    """Information Theoretic Minimum Spanning Tree Clustering.
+
+    Recursively splits dataset into two cluster.
+    Finds best cluster to split based on increase of objective.
+
+    Parameters
+    ----------
+    X: ndarray, shape=[n_samples, n_features]
+        Input data
+    n_clusters: int
+        number of clusters the data is split into
+    return_everything: bool
+        whether to return the euclidean MST, removed edges and objectives
+        or just the resulting clustering.
+
+    Returns
+    ------
+    y: ndarray, shape=[n_samples]
+        Cluster labels
+    obj: float
+        objective value of solution
+    """
 
     n_samples, n_features = X.shape
     edges = mst_dual_boruvka(X)
@@ -68,9 +88,22 @@ def itm(X, n_cluster=2, return_everything=False):
 
 
 def itm_binary(graph, n_features, return_edge=False):
-    """ calculate split criterion for all edges
-    using "message passing" style algorithm to sum edges
-    and count nodes in subtrees. "up" is the root, "down" the leaves."""
+    """Calculate best split of a MST according to MI objective.
+
+    Calculate split criterion for all edges using "message passing" style
+    algorithm to sum edges and count nodes in subtrees. "up" is the root,
+    "down" the leaves.
+
+    Parameters
+    ----------
+    graph: sparse matrix, shape=[n_samples, n_samples]
+        non-zero entries represent edges in the MST,
+        values give the length of the edge.
+    n_features: int
+        dimensionality of the input space
+    return_edge: boolean
+        Whether to return the edge that was cut
+    """
     n_samples = graph.shape[0]
 
     graph_sym = graph + graph.T

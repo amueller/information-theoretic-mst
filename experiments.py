@@ -1,12 +1,12 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-from heuristics import cut_biggest
-
-from mean_nn import mean_nn
-from plot_clustering import plot_clustering
-from tree_entropy import tree_information
 from sklearn.metrics import adjusted_rand_score, adjusted_mutual_info_score
+from sklearn.cluster import KMeans
+
+# Normalized mutual information is only available
+# in the current development version. See if we can import,
+# otherwise use dummy.
 
 normalized_mutual_info_score = lambda x, y: np.NaN
 try:
@@ -14,12 +14,11 @@ try:
 except ImportError:
     pass
 
-from sklearn.cluster import KMeans
-
+from heuristics import cut_biggest
+from mean_nn import mean_nn
+from plot_clustering import plot_clustering
+from tree_entropy import tree_information
 from itm import itm
-
-from IPython.core.debugger import Tracer
-tracer = Tracer()
 
 
 def do_experiments(dataset, plot, three_d=False):
