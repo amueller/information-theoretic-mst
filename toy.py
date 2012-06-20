@@ -1,17 +1,18 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-from mst_split_test import mst_multi_split
+from itm import itm
 from heuristics import cut_biggest
 from plot_clustering import plot_clustering
 from mean_nn import mean_nn
+
 from sklearn.preprocessing import Scaler
+from sklearn import datasets
+from sklearn.cluster import KMeans
+from make_circles import make_circles
 
-from heuristics import graph_to_indicator
 
-from IPython.core.debugger import Tracer
-tracer = Tracer()
-
+# first, illustrate progress of algorithm
 n_samples = 40
 n_noise = 10
 np.random.seed(0)
@@ -24,90 +25,73 @@ X2 -= X2.mean(axis=0)
 X3 -= X3.mean(axis=0)
 X4 -= X4.mean(axis=0)
 
-plt.figure()
+plt.figure(figsize=(12, 4))
 
-X1[:, 0] -=  6
+X1[:, 0] -= 6
 X2[:, 0] += 6
 X3[:, 1] += 5
 X = np.vstack([X1, X2, X3, X4])
 # plot data
-#st_plot = plt.subplot(131)
-st_plot = plt.subplot(111)
-forest, _ = mst_multi_split(X, n_cluster=1, return_everything=True)
+st_plot = plt.subplot(131, title="full mst")
+forest, _ = itm(X, n_cluster=1, return_everything=True)
 plot_clustering(X, forest=forest, axes=st_plot)
-plt.xticks(())
-plt.yticks(())
-plt.subplots_adjust(0, 0, 1, 1)
-plt.savefig("illustration_left.pdf")
-plt.close()
-
-# mst clustering
-#st1_plot = plt.subplot(132)
-st1_plot = plt.subplot(111)
-forest, _ = mst_multi_split(X, n_cluster=2, return_everything=True)
+# first cut
+st1_plot = plt.subplot(132, title="first cut")
+forest, _ = itm(X, n_cluster=2, return_everything=True)
 plot_clustering(X, forest=forest, axes=st1_plot)
-plt.subplots_adjust(0, 0, 1, 1)
-plt.savefig("illustration_center.pdf")
-plt.close()
-# mst flip tree
-#st2_plot = plt.subplot(133)
-st2_plot = plt.subplot(111)
-forest, _ = mst_multi_split(X, n_cluster=3, return_everything=True)
+# second cut
+st2_plot = plt.subplot(133, title="second cut")
+forest, _ = itm(X, n_cluster=3, return_everything=True)
 plot_clustering(X, forest=forest, axes=st2_plot)
-plt.subplots_adjust(0, 0, 1, 1)
-plt.savefig("illustration_right.pdf")
+plt.show()
 
 
-# load / generate datasets
-from sklearn import datasets
-from sklearn.cluster import KMeans
+# load / generate datasets for comparison
 noise = np.random.uniform(size=(10, 2))
 noise = Scaler().fit_transform(noise) * 1
 data = np.loadtxt("twomoons-test.txt")
 twomoons = np.vstack([data[:, 1:], noise])
 twomoons = Scaler().fit_transform(twomoons)
-#twomoons, _ = datasets.make_moons()
 blobs, _ = datasets.make_blobs(random_state=10)
 blobs = np.vstack([Scaler().fit_transform(blobs), noise])
-from make_circles import make_circles
 circles, _ = make_circles(factor=.4, noise=.05, n_samples=200)
 circles = np.vstack([circles, noise])
 circles2, _ = make_circles(factor=.1, noise=.05, n_samples=200)
 circles2 = np.vstack([circles2, noise])
 
-for data in ["twomoons", "blobs", "circles", "circles2"]:
+plt.figure(figsize=(12, 10))
+
+for i, data in enumerate(["twomoons", "blobs", "circles", "circles2"]):
     X = eval(data)
     if data in ["twomoons", "circles", "circles2"]:
         n_cluster = 2
     else:
         n_cluster = 3
     km = KMeans(k=n_cluster).fit(X)
-    plot_clustering(X, km.labels_)
-    plt.subplots_adjust(0, 0, 1, 1)
-    plt.savefig("qualitative_%s_km.pdf" % data)
-    plt.close()
+    ax = plt.subplot(4, 4, 4 * i + 1)
+    if i is 0:
+        ax.set_title("k-means")
+    plot_clustering(X, km.labels_, axes=ax)
 
-    mst_st, _ = mst_multi_split(X, n_cluster=n_cluster)
-    plot_clustering(X, mst_st)
-    plt.subplots_adjust(0, 0, 1, 1)
-    plt.savefig("qualitative_%s_mst.pdf" % data)
-    plt.close()
+    mst_st, _ = itm(X, n_cluster=n_cluster)
+    ax = plt.subplot(4, 4, 4 * i + 2)
+    if i is 0:
+        ax.set_title("itm")
+    plot_clustering(X, mst_st, axes=ax)
 
-    mst_agg, _ = cut_biggest(X, n_cluster=n_cluster)
-    y_agg = graph_to_indicator(mst_agg)
-    plot_clustering(X, y_agg)
-    plt.subplots_adjust(0, 0, 1, 1)
-    plt.savefig("qualitative_%s_aggl.pdf" % data)
-    plt.close()
+    y_agg, _ = cut_biggest(X, n_cluster=n_cluster)
+    ax = plt.subplot(4, 4, 4 * i + 3)
+    if i is 0:
+        ax.set_title("single link")
+    plot_clustering(X, y_agg, axes=ax)
 
     best = np.inf
-    for i in xrange(10):
-        labels_, x = mean_nn(X, n_cluster=n_cluster)
-        if x < best:
-            best = x
-            labels_mean_nn = labels_
-    #mean_nn_st = graph_from_labels(X, labels_mean_nn)
-    plot_clustering(X, labels_mean_nn)
-    plt.subplots_adjust(0, 0, 1, 1)
-    plt.savefig("qualitative_%s_mean_nn.pdf" % data)
-    plt.close()
+    # we do it only once for illustration purposes
+    # figure in paper used best of 10 initializations
+    labels_mean_nn, x = mean_nn(X, n_cluster=n_cluster)
+    ax = plt.subplot(4, 4, 4 * i + 4)
+    if i is 0:
+        ax.set_title("meanNN")
+    plot_clustering(X, labels_mean_nn, axes=ax)
+plt.subplots_adjust(.02, .02, .98, .95, 0.1, 0.1)
+plt.show()
