@@ -11,7 +11,9 @@ Please cite the paper if you use this code.
 
 FEATURES
 --------
-Implements MeanNN (See 
+Implements ITM as describe in the paper "Information Theoretic Clustering using Minimum Spanning Trees".
+Also implements MeanNN (See Faivishevsky, L. and Goldberger, J. [A nonparametric information theoretic clustering algorithm](http://eprints.pascal-network.org/archive/00007747/) )
+and single-link agglomerative clustering for comparison.
 
 
 DEPENDENCIES
@@ -34,11 +36,17 @@ The toy examples can be reproduced using ``python toy.py``.
 FILES
 -----
 ``experiments.py`` - reproduce UCI data experiments from paper
+
 ``itm.py`` - implements information theoretic clustering using minimum spanning trees
+
 ``mean_nn.py`` - implements MeanNN (see ..)
+
 ``mst.py`` - wraps several MST methods, in particluar dual tree Boruvka from mlpack
+
 ``plot_clustering.py`` - plots high-dimensional clusterings via PCA
+
 ``toy.py`` - perform toy examples
+
 ``tree_entropy.py`` - computes MST based entropy objective
 
 
