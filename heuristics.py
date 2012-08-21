@@ -1,6 +1,6 @@
 import numpy as np
 from scipy import sparse
-from mst import mst_dual_boruvka
+from mst import mst
 
 
 def cut_biggest(X, n_cluster=2):
@@ -25,7 +25,7 @@ def cut_biggest(X, n_cluster=2):
     obj: 0
         Dummy "objective value" of 0 for interface compatibility.
     """
-    edges = mst_dual_boruvka(X)
+    edges = mst(X)
     weights = edges[:, 2]
     inds = np.argsort(weights)[::-1]
     n_samples = len(edges) + 1

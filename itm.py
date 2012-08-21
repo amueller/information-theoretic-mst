@@ -1,7 +1,10 @@
 from scipy import sparse
-from tree_entropy import mst_dual_boruvka, tree_information_sparse
-
 import numpy as np
+
+from block_diag import block_diag
+from mst import mst
+from tree_entropy import tree_information_sparse
+
 DTYPE = np.float
 ITYPE = np.int
 
@@ -31,7 +34,7 @@ def itm(X, n_cluster=2, return_everything=False):
     """
 
     n_samples, n_features = X.shape
-    edges = mst_dual_boruvka(X)
+    edges = mst(X)
     weights = edges[:, 2]
     edges = edges[:, :2].astype(np.int)
     forest = sparse.coo_matrix((weights, (edges[:, 0], edges[:, 1])),
@@ -78,7 +81,7 @@ def itm(X, n_cluster=2, return_everything=False):
         y[c] = i
 
     # for computing the objective, we don't care about the indices
-    result = sparse.block_diag([c[0] for c in clusters], format='csr')
+    result = block_diag([c[0] for c in clusters], format='csr')
     if return_everything:
         concatenated_inds = [x for c in c_inds for x in c]
         inverse_inds = np.argsort(concatenated_inds)

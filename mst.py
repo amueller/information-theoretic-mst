@@ -1,24 +1,14 @@
 import numpy as np
 import os
 import tempfile
+from scipy.spatial.distance import pdist, squareform
 
-import warnings
 
-from IPython.core.debugger import Tracer
-
-tracer = Tracer()
-
-def minimum_spanning_tree(X, copy_X=True, graph=None):
+def minimum_spanning_tree(X):
     """X are edge weights of fully connected graph"""
-    if copy_X:
-        X = X.copy()
-    if X.shape[0] == 1:
-        warnings.warn("Only one node given to MST")
-        return np.array([])
-
-    if X.shape[0] != X.shape[1]:
-        raise ValueError("X needs to be square matrix of edge weights")
-    n_vertices = X.shape[0]
+    dists = squareform(pdist(X))
+    dists_copy = dists.copy()
+    n_vertices = dists.shape[0]
     spanning_edges = []
 
     # initialize with node 0:
@@ -26,10 +16,10 @@ def minimum_spanning_tree(X, copy_X=True, graph=None):
     num_visited = 1
     # exclude self connections:
     diag_indices = np.arange(n_vertices)
-    X[diag_indices, diag_indices] = np.inf
+    dists[diag_indices, diag_indices] = np.inf
 
     while num_visited != n_vertices:
-        new_edge = np.argmin(X[visited_vertices], axis=None)
+        new_edge = np.argmin(dists[visited_vertices], axis=None)
         # 2d encoding of new_edge from flat, get correct indices
         new_edge = divmod(new_edge, n_vertices)
         new_edge = [visited_vertices[new_edge[0]], new_edge[1]]
@@ -37,10 +27,12 @@ def minimum_spanning_tree(X, copy_X=True, graph=None):
         spanning_edges.append(new_edge)
         visited_vertices.append(new_edge[1])
         # remove all edges inside current tree
-        X[visited_vertices, new_edge[1]] = np.inf
-        X[new_edge[1], visited_vertices] = np.inf
+        dists[visited_vertices, new_edge[1]] = np.inf
+        dists[new_edge[1], visited_vertices] = np.inf
         num_visited += 1
-    return np.vstack(spanning_edges)
+    edges = np.vstack(spanning_edges)
+    weights = dists_copy[edges[:, 0], edges[:, 1]]
+    return np.hstack([edges, weights[:, np.newaxis]])
 
 
 def test_mst():
@@ -87,7 +79,7 @@ def time_mst():
     X = X[:1000, :]
     start = time()
     mst_db = mst_dual_boruvka(X)
-    print("dual boruvka: %f"%(time() - start))
+    print("dual boruvka: %f" % (time() - start))
 
     start = time()
     dists = squareform(pdist(X))
@@ -107,3 +99,6 @@ def time_mst():
 if __name__ == "__main__":
     #test_mst()
     time_mst()
+
+
+mst = minimum_spanning_tree

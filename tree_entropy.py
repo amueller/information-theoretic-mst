@@ -2,7 +2,7 @@ import numpy as np
 import warnings
 
 from scipy import sparse
-from mst import mst_dual_boruvka
+from mst import mst
 
 
 def tree_information(X, y):
@@ -44,7 +44,7 @@ def spanning_tree_length(X):
     """
     if X.shape[0] < 2:
         return 0
-    edges = mst_dual_boruvka(X)
+    edges = mst(X)
     return np.sum([e[2] for e in edges])
 
 
