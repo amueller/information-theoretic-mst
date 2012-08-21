@@ -50,16 +50,6 @@ def test_mst():
     plt.show()
 
 
-def minimum_spanning_tree_nx(dists, graph=None):
-    import networkx as nx
-    if graph is None:
-        graph = nx.complete_graph(dists.shape[0])
-        for u, v, d in graph.edges(data=True):
-            d['weight'] = dists[u, v]
-    edges = nx.minimum_spanning_edges(graph)
-    return np.array([x[:2] for x in edges])
-
-
 def mst_dual_boruvka(X):
     datafile = tempfile.NamedTemporaryFile(suffix='.txt')
     outfile = tempfile.NamedTemporaryFile(suffix='.csv')
@@ -68,37 +58,6 @@ def mst_dual_boruvka(X):
             "--input_file %s -o %s" % (datafile.name, outfile.name))
     edges = np.loadtxt(outfile.name, delimiter=',')
     return np.atleast_2d(edges)
-
-
-def time_mst():
-    from time import time
-    from sklearn import datasets
-    from scipy.spatial.distance import pdist, squareform
-    data = datasets.fetch_mldata("usps")
-    X, y = data.data, data.target
-    X = X[:1000, :]
-    start = time()
-    mst_db = mst_dual_boruvka(X)
-    print("dual boruvka: %f" % (time() - start))
-
-    start = time()
-    dists = squareform(pdist(X))
-    print("dists: %f" % (time() - start))
-    start = time()
-    mst_np = minimum_spanning_tree(dists)
-    print("mst: %f" % (time() - start))
-    start = time()
-    mst_nx = minimum_spanning_tree_nx(dists)
-    print("mst nx: %f" % (time() - start))
-    assert(np.array([mst_db.has_edge(*e) for e in mst_np]).all())
-    assert(np.array([mst_db.has_edge(*e) for e in mst_nx]).all())
-    #tracer()
-    return [mst_db, mst_np, mst_nx]
-
-
-if __name__ == "__main__":
-    #test_mst()
-    time_mst()
 
 
 mst = minimum_spanning_tree
