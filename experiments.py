@@ -36,8 +36,8 @@ def do_experiments(dataset, plot, three_d=False):
         y = y[mask]
 
     n_cluster = len(np.unique(y))
-    print("\n\nDataset %s samples: %d, features: %d, clusters: %d"
-            % (dataset_name, X.shape[0], X.shape[1], n_cluster))
+    print("\n\nDataset %s samples: %d, features: %d, clusters: %d" %
+          (dataset_name, X.shape[0], X.shape[1], n_cluster))
     print("=" * 70)
 
     if plot:
@@ -60,13 +60,14 @@ def do_experiments(dataset, plot, three_d=False):
         if plot:
             ax = fig.add_subplot(1, len(names) + 2, i + 1)
             ax = plot_clustering(X_plot, y_, ax, three_d=three_d)
-            ax.set_title("%-15s ARI %.3f, AMI: %.3f, NMI: %.3f obj: %.2f"
-                    % (name, adjusted_rand_score(y, y_),
-                        adjusted_mutual_info_score(y, y_),
-                        normalized_mutual_info_score(y, y_), i_))
-        print("%-15s ARI: %.3f, AMI: %.3f, NMI: %.3f objective: %.3f" % (name,
-            adjusted_rand_score(y, y_), adjusted_mutual_info_score(y, y_),
-            normalized_mutual_info_score(y, y_), i_))
+            ax.set_title("%-15s ARI %.3f, AMI: %.3f, NMI: %.3f obj: %.2f" %
+                         (name, adjusted_rand_score(y, y_),
+                          adjusted_mutual_info_score(y, y_),
+                          normalized_mutual_info_score(y, y_), i_))
+        print("%-15s ARI: %.3f, AMI: %.3f, NMI: %.3f objective: %.3f"
+              % (name, adjusted_rand_score(y, y_),
+                 adjusted_mutual_info_score(y, y_),
+                 normalized_mutual_info_score(y, y_), i_))
     kmeans = KMeans(k=n_cluster, n_init=1).fit(X)
     kmeans_ARI = adjusted_rand_score(y, kmeans.labels_)
     kmeans_AMI = adjusted_mutual_info_score(y, kmeans.labels_)
@@ -91,24 +92,24 @@ def do_experiments(dataset, plot, three_d=False):
     if plot:
         kmeans_plot = fig.add_subplot(1, len(names) + 2, len(names) + 1)
         kmeans_plot = plot_clustering(X_plot, kmeans.labels_, kmeans_plot,
-                three_d=three_d)
-        kmeans_plot.set_title("kmeans ARI: %.3f, AMI: %.3f" % (kmeans_ARI,
-            kmeans_AMI))
+                                      three_d=three_d)
+        kmeans_plot.set_title("kmeans ARI: %.3f, AMI: %.3f"
+                              % (kmeans_ARI, kmeans_AMI))
 
         mean_nn_plot = fig.add_subplot(1, len(names) + 4, len(names) + 3)
         mean_nn_plot = plot_clustering(X_plot, mean_nn_labels, mean_nn_plot,
-                three_d=three_d)
-        mean_nn_plot.set_title("mean_nn ARI: %.3f, AMI: %.3f" % (mean_nn_ARI,
-            mean_nn_AMI))
+                                       three_d=three_d)
+        mean_nn_plot.set_title("mean_nn ARI: %.3f, AMI: %.3f"
+                               % (mean_nn_ARI, mean_nn_AMI))
 
         gt_plot = fig.add_subplot(1, len(names) + 2, len(names) + 2)
         gt_plot = plot_clustering(X_plot, y, gt_plot, three_d=three_d)
         gt_plot.set_title("ground truth objective: %.3f" % i_gt)
 
     print("%-15s ARI: %.3f, AMI: %.3f, NMI: %.3f objective: %.3f" %
-            ("MeanNN", mean_nn_ARI, mean_nn_AMI, mean_nn_NMI, i_mean_nn))
+          ("MeanNN", mean_nn_ARI, mean_nn_AMI, mean_nn_NMI, i_mean_nn))
     print("%-15s ARI: %.3f, AMI: %.3f, NMI: %.3f objective: %.3f" %
-            ("K-Means", kmeans_ARI, kmeans_AMI, kmeans_NMI, i_kmeans))
+          ("K-Means", kmeans_ARI, kmeans_AMI, kmeans_NMI, i_kmeans))
     print("GT objective: %.3f" % i_gt)
 
     if plot:
