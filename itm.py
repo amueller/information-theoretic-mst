@@ -1,15 +1,17 @@
 from scipy import sparse
 import numpy as np
 
+from sklearn.utils.mst import minimum_spanning_tree
+from sklearn.metrics import euclidean_distances
+
 from block_diag import block_diag
-from mst import mst
 from tree_entropy import tree_information_sparse
 
 DTYPE = np.float
 ITYPE = np.int
 
 
-def itm(X, n_cluster=2, return_everything=False):
+def itm(X, n_cluster=2, return_everything=False, mst_precomputed=None):
     """Information Theoretic Minimum Spanning Tree Clustering.
 
     Recursively splits dataset into two cluster.
@@ -17,31 +19,42 @@ def itm(X, n_cluster=2, return_everything=False):
 
     Parameters
     ----------
-    X: ndarray, shape=[n_samples, n_features]
-        Input data
-    n_clusters: int
-        number of clusters the data is split into
-    return_everything: bool
-        whether to return the euclidean MST, removed edges and objectives
+    X : ndarray, shape=[n_samples, n_features]
+        Input data.
+
+    n_clusters : int, default=None
+        Number of clusters the data is split into.
+
+    return_everything : bool, default=None
+        Whether to return the euclidean MST, removed edges and objectives
         or just the resulting clustering.
+
+    mst_precomputed : array-like or None, default=None
+        Precomputed minimum spanning tree, given as weighted edge-list.
+        Can be used to speed up computations.
 
     Returns
     ------
-    y: ndarray, shape=[n_samples]
+    y : ndarray, shape=[n_samples]
         Cluster labels
-    obj: float
+
+    obj : float
         objective value of solution
     """
 
     n_samples, n_features = X.shape
-    edges = mst(X)
+    if mst_precomputed is not None:
+        edges = mst_precomputed
+    else:
+        mst = minimum_spanning_tree(euclidean_distances(X))
+        edges = np.hstack([np.c_[mst.nonzero()], mst.data[:, np.newaxis]])
+
     weights = edges[:, 2]
     edges = edges[:, :2].astype(np.int)
     forest = sparse.coo_matrix((weights, (edges[:, 0], edges[:, 1])),
-            shape=(n_samples, n_samples)).tocsr()
+                               shape=(n_samples, n_samples)).tocsr()
     clusters = [(forest, np.arange(n_samples))]
-    cut_improvement = [itm_binary(forest.copy(), n_features,
-        return_edge=True)]
+    cut_improvement = [itm_binary(forest.copy(), n_features, return_edge=True)]
     # init cluster_infos to anything.
     # doesn't matter any way as there is only one component
     cluster_infos = [0]
@@ -49,8 +62,9 @@ def itm(X, n_cluster=2, return_everything=False):
     removed_edges = []
     # keep all possible next splits, pick the one with highest gain.
     while len(clusters) < n_cluster:
-        possible_improvements = (np.array([cut_i[1] * cut_i[0].shape[0]
-            for cut_i in cut_improvement]) - np.array(cluster_infos))
+        possible_improvements = (np.array([cut_i[1] * cut_i[0].shape[0] for
+                                           cut_i in cut_improvement]) -
+                                 np.array(cluster_infos))
         i_to_split = np.argmax(possible_improvements)
         split, info, edge = cut_improvement.pop(i_to_split)
         # get rid of old cluster
@@ -70,7 +84,7 @@ def itm(X, n_cluster=2, return_everything=False):
             mi = tree_information_sparse(clusters[-1][0], n_features)
             cluster_infos.append(mi)
             imp = itm_binary(clusters[-1][0].copy(), n_features,
-                    return_edge=True)
+                             return_edge=True)
             cut_improvement.append(imp)
 
     # correspondence of nodes to datapoints not present in sparse matrices
@@ -111,12 +125,9 @@ def itm_binary(graph, n_features, return_edge=False):
 
     graph_sym = graph + graph.T
     graph_sym = graph_sym.tocsr()
-    distances = np.asarray(graph_sym.data,
-                            dtype=DTYPE, order='C')
-    neighbors = np.asarray(graph_sym.indices,
-                            dtype=ITYPE, order='C')
-    indptr = np.asarray(graph_sym.indptr,
-                         dtype=ITYPE, order='C')
+    distances = np.asarray(graph_sym.data, dtype=DTYPE, order='C')
+    neighbors = np.asarray(graph_sym.indices, dtype=ITYPE, order='C')
+    indptr = np.asarray(graph_sym.indptr, dtype=ITYPE, order='C')
 
     # from leaves to root pass
     # need this to see if all messages have arrived yet so we can go on
@@ -160,7 +171,8 @@ def itm_binary(graph, n_features, return_edge=False):
             n = neighbors[i]
             if n != parent[x]:
                 incoming_down[n] += (incoming_down[x] + distances[i] +
-                        incoming_up_accumulated[x] - incoming_up[x, n])
+                                     incoming_up_accumulated[x] -
+                                     incoming_up[x, n])
                 parent[n] = x
                 to_visit.append(n)
 
@@ -173,7 +185,7 @@ def itm_binary(graph, n_features, return_edge=False):
         p = parent[x]
         # sum in parent part:
         p_weights = float(incoming_down[p] + incoming_up_accumulated[p] -
-                incoming_up_accumulated[x] - graph_sym[x, p])
+                          incoming_up_accumulated[x] - graph_sym[x, p])
         # sum in child part:
         c_weights = float(incoming_up_accumulated[x])
         # nodes in child part:
@@ -188,9 +200,9 @@ def itm_binary(graph, n_features, return_edge=False):
 
         assert(p_weights > 0)
         objective = (p_nodes * ((n_features - 1) * np.log(p_nodes)
-                    - n_features * np.log(p_weights)))
+                     - n_features * np.log(p_weights)))
         objective += (c_nodes * ((n_features - 1) * np.log(c_nodes)
-                    - n_features * np.log(c_weights)))
+                      - n_features * np.log(c_weights)))
         if objective > best_objective:
             best_cut = x
             best_objective = objective
