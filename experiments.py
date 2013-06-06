@@ -1,5 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
+from time import time
 
 from sklearn.metrics import adjusted_rand_score, adjusted_mutual_info_score
 from sklearn.cluster import KMeans
@@ -52,7 +53,9 @@ def do_experiments(dataset, plot, three_d=False):
     X_plot = X
     for i, method in enumerate(zip(functions, names)):
         function, name = method
+        start = time()
         st_, i_ = function(X, n_cluster=n_cluster)
+        runtime = time() - start
         sts.append(st_)
         informations.append(i_)
         y_ = st_
@@ -64,11 +67,15 @@ def do_experiments(dataset, plot, three_d=False):
                          (name, adjusted_rand_score(y, y_),
                           adjusted_mutual_info_score(y, y_),
                           normalized_mutual_info_score(y, y_), i_))
-        print("%-15s ARI: %.3f, AMI: %.3f, NMI: %.3f objective: %.3f"
+        print("%-15s ARI: %.3f, AMI: %.3f, NMI: %.3f objective: %.3f time:%.2f"
               % (name, adjusted_rand_score(y, y_),
                  adjusted_mutual_info_score(y, y_),
-                 normalized_mutual_info_score(y, y_), i_))
-    kmeans = KMeans(k=n_cluster, n_init=1).fit(X)
+                 normalized_mutual_info_score(y, y_), i_,
+                 runtime)
+              )
+    start = time()
+    kmeans = KMeans(n_clusters=n_cluster, n_init=1).fit(X)
+    time_kmeans = time() - start
     kmeans_ARI = adjusted_rand_score(y, kmeans.labels_)
     kmeans_AMI = adjusted_mutual_info_score(y, kmeans.labels_)
     kmeans_NMI = normalized_mutual_info_score(y, kmeans.labels_)
@@ -76,11 +83,13 @@ def do_experiments(dataset, plot, three_d=False):
 
     # repeat MeanNN ten times, keep best
     opt_value = np.inf
+    start = time()
     for init in xrange(10):
         mean_nn_labels_, blub = mean_nn(X, n_cluster=n_cluster)
         if blub < opt_value:
             mean_nn_labels = mean_nn_labels_
             opt_value = blub
+    time_mean_nn = time() - start
 
     mean_nn_ARI = adjusted_rand_score(y, mean_nn_labels)
     mean_nn_AMI = adjusted_mutual_info_score(y, mean_nn_labels)
@@ -106,10 +115,12 @@ def do_experiments(dataset, plot, three_d=False):
         gt_plot = plot_clustering(X_plot, y, gt_plot, three_d=three_d)
         gt_plot.set_title("ground truth objective: %.3f" % i_gt)
 
-    print("%-15s ARI: %.3f, AMI: %.3f, NMI: %.3f objective: %.3f" %
-          ("MeanNN", mean_nn_ARI, mean_nn_AMI, mean_nn_NMI, i_mean_nn))
-    print("%-15s ARI: %.3f, AMI: %.3f, NMI: %.3f objective: %.3f" %
-          ("K-Means", kmeans_ARI, kmeans_AMI, kmeans_NMI, i_kmeans))
+    print("%-15s ARI: %.3f, AMI: %.3f, NMI: %.3f objective: %.3f time: %.2f" %
+          ("MeanNN", mean_nn_ARI, mean_nn_AMI, mean_nn_NMI, i_mean_nn,
+           time_mean_nn))
+    print("%-15s ARI: %.3f, AMI: %.3f, NMI: %.3f objective: %.3f time: %.2f" %
+          ("K-Means", kmeans_ARI, kmeans_AMI, kmeans_NMI, i_kmeans,
+           time_kmeans))
     print("GT objective: %.3f" % i_gt)
 
     if plot:
