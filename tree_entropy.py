@@ -2,7 +2,9 @@ import numpy as np
 import warnings
 
 from scipy import sparse
-from mst import mst
+
+from sklearn.utils.sparsetools import minimum_spanning_tree
+from sklearn.metrics import euclidean_distances
 
 
 def tree_information(X, y):
@@ -44,8 +46,7 @@ def spanning_tree_length(X):
     """
     if X.shape[0] < 2:
         return 0
-    edges = mst(X)
-    return np.sum([e[2] for e in edges])
+    return minimum_spanning_tree(euclidean_distances(X)).sum()
 
 
 def tree_information_sparse(forest, n_features):

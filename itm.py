@@ -4,12 +4,13 @@ from scipy import sparse
 import numpy as np
 
 from sklearn.base import BaseEstimator, ClusterMixin
-from sklearn.utils.mst import minimum_spanning_tree
+from sklearn.utils.sparsetools import minimum_spanning_tree
 from sklearn.metrics import euclidean_distances
 
 
 from block_diag import block_diag
 from tree_entropy import tree_information_sparse
+from infer_dimensionality import estimate_dimension
 
 DTYPE = np.float
 ITYPE = np.int
@@ -29,14 +30,9 @@ class ITM(BaseEstimator, ClusterMixin):
     X : ndarray, shape=[n_samples, n_features]
         Input data.
 
-
-    return_everything : bool, default=None
-        Whether to return the euclidean MST, removed edges and objectives
-        or just the resulting clustering.
-
-    mst_precomputed : array-like or None, default=None
-        Precomputed minimum spanning tree, given as weighted edge-list.
-        Can be used to speed up computations.
+    infer_dimensionality : bool, default=False
+        Whether to infer the dimensionality using a dimension estimation method.
+        If False, the input dimensionality will be used.
 
     Returns
     ------
@@ -46,8 +42,9 @@ class ITM(BaseEstimator, ClusterMixin):
     obj : float
         objective value of solution
     """
-    def __init__(self, n_clusters=2):
+    def __init__(self, n_clusters=2, infer_dimensionality=False):
         self.n_clusters = n_clusters
+        self.infer_dimensionality = infer_dimensionality
 
     def fit(self, X, mst_precomputed=None):
         """
@@ -62,11 +59,16 @@ class ITM(BaseEstimator, ClusterMixin):
         """
         n_samples, n_features = X.shape
         # the dimensionality of the space can at most be n_samples
-        if n_samples < n_features:
+        if self.infer_dimensionality:
+            intrinsic_dimensionality = estimate_dimension(X)
+        elif n_samples < n_features:
             warnings.warn("Got dataset with n_samples < n_features. Setting"
                           "intrinsic dimensionality to n_samples. This is most"
-                          " likely to high, leading to uneven clusters.")
-        n_features = min(n_samples, n_features)
+                          " likely to high, leading to uneven clusters."
+                          " It is recommendet to set infer_dimensionality=True.")
+            intrinsic_dimensionality = n_samples
+        else:
+            intrinsic_dimensionality = n_features
 
         if mst_precomputed is not None:
             edges = mst_precomputed
@@ -79,7 +81,7 @@ class ITM(BaseEstimator, ClusterMixin):
         forest = sparse.coo_matrix((weights, (edges[:, 0], edges[:, 1])),
                                    shape=(n_samples, n_samples)).tocsr()
         clusters = [(forest, np.arange(n_samples))]
-        cut_improvement = [itm_binary(forest.copy(), n_features,
+        cut_improvement = [itm_binary(forest.copy(), intrinsic_dimensionality,
                                       return_edge=True)]
         # init cluster_infos to anything.
         # doesn't matter any way as there is only one component
@@ -108,9 +110,9 @@ class ITM(BaseEstimator, ClusterMixin):
                 inds = np.where(split_components_indicator == i)[0]
                 clusters.append((split[inds[np.newaxis, :], inds],
                                  old_inds[inds]))
-                mi = tree_information_sparse(clusters[-1][0], n_features)
+                mi = tree_information_sparse(clusters[-1][0], intrinsic_dimensionality)
                 cluster_infos.append(mi)
-                imp = itm_binary(clusters[-1][0].copy(), n_features,
+                imp = itm_binary(clusters[-1][0].copy(), intrinsic_dimensionality,
                                  return_edge=True)
                 cut_improvement.append(imp)
 
@@ -123,18 +125,13 @@ class ITM(BaseEstimator, ClusterMixin):
 
         # for computing the objective, we don't care about the indices
         result = block_diag([c[0] for c in clusters], format='csr')
-        #if return_everything:
-            #concatenated_inds = [x for c in c_inds for x in c]
-            #inverse_inds = np.argsort(concatenated_inds)
-            #sorted_result = result[inverse_inds[:, np.newaxis], inverse_inds]
-            #return sorted_result, removed_edges
         self.labels_ = y
-        self.tree_information_ = (tree_information_sparse(result, n_features) /
+        self.tree_information_ = (tree_information_sparse(result, intrinsic_dimensionality) /
                                   n_samples)
         return self
 
 
-def itm_binary(graph, n_features, return_edge=False):
+def itm_binary(graph, intrinsic_dimensionality, return_edge=False):
     """Calculate best split of a MST according to MI objective.
 
     Calculate split criterion for all edges using "message passing" style
@@ -146,7 +143,7 @@ def itm_binary(graph, n_features, return_edge=False):
     graph: sparse matrix, shape=[n_samples, n_samples]
         non-zero entries represent edges in the MST,
         values give the length of the edge.
-    n_features: int
+    intrinsic_dimensionality: int
         dimensionality of the input space
     return_edge: boolean
         Whether to return the edge that was cut
@@ -229,10 +226,10 @@ def itm_binary(graph, n_features, return_edge=False):
             continue
 
         assert(p_weights > 0)
-        objective = (p_nodes * ((n_features - 1) * np.log(p_nodes)
-                     - n_features * np.log(p_weights)))
-        objective += (c_nodes * ((n_features - 1) * np.log(c_nodes)
-                      - n_features * np.log(c_weights)))
+        objective = (p_nodes * ((intrinsic_dimensionality - 1) * np.log(p_nodes)
+                     - intrinsic_dimensionality * np.log(p_weights)))
+        objective += (c_nodes * ((intrinsic_dimensionality - 1) * np.log(c_nodes)
+                      - intrinsic_dimensionality * np.log(c_weights)))
         if objective > best_objective:
             best_cut = x
             best_objective = objective
