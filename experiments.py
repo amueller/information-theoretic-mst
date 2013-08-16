@@ -39,10 +39,11 @@ def do_experiments(dataset):
           (dataset_name, X.shape[0], X.shape[1], n_clusters))
     print("=" * 70)
 
-    classes = [ITM, Ward, KMeans]
-    names = ["MST multi cut", "Ward", "KMeans"]
-    for Clusterer, method in zip(classes, names):
-        clusterer = Clusterer(n_clusters=n_clusters)
+    classes = [ITM(n_clusters=n_clusters),
+               ITM(n_clusters=n_clusters, infer_dimensionality=True),
+               Ward(n_clusters=n_clusters), KMeans(n_clusters=n_clusters)]
+    names = ["ITM", "ITM ID", "Ward", "KMeans"]
+    for clusterer, method in zip(classes, names):
         start = time()
         clusterer.fit(X)
         y_pred = clusterer.labels_
@@ -67,12 +68,12 @@ if __name__ == "__main__":
     vehicle = datasets.fetch_mldata("vehicle")
     waveform = datasets.fetch_mldata("Waveform IDA")
     vowel = datasets.fetch_mldata("vowel")
+    mnist = datasets.fetch_mldata("MNIST original")
     faces = datasets.fetch_olivetti_faces()
     iris = datasets.load_iris()
     digits = datasets.load_digits()
 
     #dataset_list = [iris, vehicle, vowel, digits, faces, usps, waveform]
-    dataset_list = [faces]
+    dataset_list = [mnist]
     for dataset in dataset_list:
         do_experiments(dataset)
-        #time_tree(dataset)
