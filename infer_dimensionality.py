@@ -26,7 +26,7 @@ def estimate_dimension(X, n_neighbors='auto', neighbors_estimator=None):
     if neighbors_estimator is None:
         neighbors_estimator = NearestNeighbors(n_neighbors=n_neighbors)
         neighbors_estimator.fit(X)
-    full_dist = neighbors_estimator.kneighbors(X)[0][:, -1]
+    full_dist = neighbors_estimator.kneighbors(X, n_neighbors=n_neighbors)[0][:, -1]
     half_dist = neighbors_estimator.kneighbors(X, n_neighbors=n_neighbors / 2)[0][:, -1]
     est = np.log(2) / np.log(full_dist / half_dist)
     est = np.minimum(est, X.shape[1])

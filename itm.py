@@ -5,8 +5,7 @@ import numpy as np
 
 from sklearn.base import BaseEstimator, ClusterMixin
 from sklearn.utils.sparsetools import minimum_spanning_tree
-from sklearn.metrics import euclidean_distances
-
+from sklearn.neighbors import NearestNeighbors
 
 from block_diag import block_diag
 from tree_entropy import tree_information_sparse
@@ -27,40 +26,67 @@ class ITM(BaseEstimator, ClusterMixin):
     n_clusters : int, default=None
         Number of clusters the data is split into.
 
-    X : ndarray, shape=[n_samples, n_features]
-        Input data.
-
     infer_dimensionality : bool, default=False
         Whether to infer the dimensionality using a dimension estimation method.
         If False, the input dimensionality will be used.
 
+    nearest_neighbor_algorithm : bool, default='auto'
+        Nearest neighbor data structure used for distance queries.
+        This parameter is passed on to sklearn.NearestNeighbors.
+        Possible choices are 'brute', 'ball_tree', 'kd_tree' and 'auto'.
+
     Returns
     ------
-    y : ndarray, shape=[n_samples]
+    y : ndarray, shape (n_samples,)
         Cluster labels
 
-    obj : float
-        objective value of solution
     """
-    def __init__(self, n_clusters=2, infer_dimensionality=False):
+    def __init__(self, n_clusters=2, infer_dimensionality=False,
+                 nearest_neighbor_algorithm='auto'):
         self.n_clusters = n_clusters
         self.infer_dimensionality = infer_dimensionality
+        self.nearest_neighbor_algorithm = nearest_neighbor_algorithm
 
     def fit(self, X, mst_precomputed=None):
         """
         Parameters
         ----------
-        X : ndarray, shape=[n_samples, n_features]
+        X : ndarray, shape (n_samples, n_features)
             Input data.
 
         mst_precomputed : array-like or None, default=None
             Precomputed minimum spanning tree, given as weighted edge-list.
             Can be used to speed up computations.
+
+        Returns
+        ------
+        self
         """
         n_samples, n_features = X.shape
+
+        self.nearest_neighbors_ = NearestNeighbors(algorithm=self.nearest_neighbor_algorithm)
+        self.nearest_neighbors_.fit(X)
+        n_neighbors = min(5, n_samples)
+        while True:
+            # make sure we have a connected minimum spanning tree.
+            # otherwise we need to consider more neighbors
+            n_neighbors = 2 * n_neighbors
+            distances = self.nearest_neighbors_.kneighbors_graph(
+                X, n_neighbors=n_neighbors, mode='distance')
+            n_components, component_indicators =\
+                sparse.cs_graph_components(distances + distances.T)
+            if len(np.unique(component_indicators)) > 1:
+                continue
+            distances.sort_indices()
+            forest = minimum_spanning_tree(distances)
+            _, inds = sparse.cs_graph_components(forest + forest.T)
+            assert(len(np.unique(inds)) == 1)
+            break
+
         # the dimensionality of the space can at most be n_samples
         if self.infer_dimensionality:
-            intrinsic_dimensionality = estimate_dimension(X)
+            intrinsic_dimensionality = estimate_dimension(
+                X, neighbors_estimator=self.nearest_neighbors_)
         elif n_samples < n_features:
             warnings.warn("Got dataset with n_samples < n_features. Setting"
                           "intrinsic dimensionality to n_samples. This is most"
@@ -70,16 +96,6 @@ class ITM(BaseEstimator, ClusterMixin):
         else:
             intrinsic_dimensionality = n_features
 
-        if mst_precomputed is not None:
-            edges = mst_precomputed
-        else:
-            mst = minimum_spanning_tree(euclidean_distances(X))
-            edges = np.hstack([np.c_[mst.nonzero()], mst.data[:, np.newaxis]])
-
-        weights = edges[:, 2]
-        edges = edges[:, :2].astype(np.int)
-        forest = sparse.coo_matrix((weights, (edges[:, 0], edges[:, 1])),
-                                   shape=(n_samples, n_samples)).tocsr()
         clusters = [(forest, np.arange(n_samples))]
         cut_improvement = [itm_binary(forest.copy(), intrinsic_dimensionality,
                                       return_edge=True)]
@@ -105,6 +121,7 @@ class ITM(BaseEstimator, ClusterMixin):
             n_split_components, split_components_indicator = \
                 sparse.cs_graph_components(split + split.T)
             assert(n_split_components == 2)
+            assert(len(np.unique(split_components_indicator)) == 2)
 
             for i in xrange(n_split_components):
                 inds = np.where(split_components_indicator == i)[0]
@@ -120,6 +137,8 @@ class ITM(BaseEstimator, ClusterMixin):
         # but we saved the indices.
         c_inds = [c[1] for c in clusters]
         y = np.empty(n_samples, dtype=np.int)
+        assert len(np.hstack(c_inds)) == n_samples
+
         for i, c in enumerate(c_inds):
             y[c] = i
 
@@ -140,12 +159,14 @@ def itm_binary(graph, intrinsic_dimensionality, return_edge=False):
 
     Parameters
     ----------
-    graph: sparse matrix, shape=[n_samples, n_samples]
+    graph : sparse matrix, shape=[n_samples, n_samples]
         non-zero entries represent edges in the MST,
         values give the length of the edge.
-    intrinsic_dimensionality: int
+
+    intrinsic_dimensionality : int
         dimensionality of the input space
-    return_edge: boolean
+
+    return_edge : boolean
         Whether to return the edge that was cut
     """
     n_samples = graph.shape[0]
@@ -191,6 +212,7 @@ def itm_binary(graph, intrinsic_dimensionality, return_edge=False):
     incoming_down = np.zeros(graph_sym.shape[0])
 
     #root to leave pass
+    # TODO refactor!!!
     while to_visit:
         x = to_visit.pop()
         visited[x] = True
@@ -217,11 +239,11 @@ def itm_binary(graph, intrinsic_dimensionality, return_edge=False):
         c_weights = float(incoming_up_accumulated[x])
         # nodes in child part:
         c_nodes = nodes_below[x] + 1  # count self
-        if c_nodes <= 1:
+        if c_nodes <= 2:
             # single node
             continue
         p_nodes = n_samples - c_nodes
-        if p_nodes <= 1:
+        if p_nodes <= 2:
             # single node
             continue
 
@@ -235,7 +257,6 @@ def itm_binary(graph, intrinsic_dimensionality, return_edge=False):
             best_objective = objective
     if best_cut is None:
         return graph, -np.inf
-
     best_objective /= n_samples
     graph[best_cut, parent[best_cut]] = 0
     graph[parent[best_cut], best_cut] = 0
