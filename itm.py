@@ -4,12 +4,13 @@ from scipy import sparse
 import numpy as np
 
 from sklearn.base import BaseEstimator, ClusterMixin
-from sklearn.utils.sparsetools import minimum_spanning_tree
 from sklearn.neighbors import NearestNeighbors
 
 from block_diag import block_diag
 from tree_entropy import tree_information_sparse
 from infer_dimensionality import estimate_dimension
+
+from mst import euclidean_mst
 
 DTYPE = np.float
 ITYPE = np.int
@@ -35,6 +36,9 @@ class ITM(BaseEstimator, ClusterMixin):
         This parameter is passed on to sklearn.NearestNeighbors.
         Possible choices are 'brute', 'ball_tree', 'kd_tree' and 'auto'.
 
+    verbose : int, default=0
+        Verbosity level.
+
     Returns
     ------
     y : ndarray, shape (n_samples,)
@@ -42,21 +46,18 @@ class ITM(BaseEstimator, ClusterMixin):
 
     """
     def __init__(self, n_clusters=2, infer_dimensionality=False,
-                 nearest_neighbor_algorithm='auto'):
+                 nearest_neighbor_algorithm='auto', verbose=0):
         self.n_clusters = n_clusters
         self.infer_dimensionality = infer_dimensionality
         self.nearest_neighbor_algorithm = nearest_neighbor_algorithm
+        self.verbose = verbose
 
-    def fit(self, X, mst_precomputed=None):
+    def fit(self, X):
         """
         Parameters
         ----------
         X : ndarray, shape (n_samples, n_features)
             Input data.
-
-        mst_precomputed : array-like or None, default=None
-            Precomputed minimum spanning tree, given as weighted edge-list.
-            Can be used to speed up computations.
 
         Returns
         ------
@@ -65,28 +66,23 @@ class ITM(BaseEstimator, ClusterMixin):
         n_samples, n_features = X.shape
 
         self.nearest_neighbors_ = NearestNeighbors(algorithm=self.nearest_neighbor_algorithm)
+        if self.verbose:
+            print("Fitting neighbors data structure.")
         self.nearest_neighbors_.fit(X)
-        n_neighbors = min(5, n_samples)
-        while True:
-            # make sure we have a connected minimum spanning tree.
-            # otherwise we need to consider more neighbors
-            n_neighbors = 2 * n_neighbors
-            distances = self.nearest_neighbors_.kneighbors_graph(
-                X, n_neighbors=n_neighbors, mode='distance')
-            n_components, component_indicators =\
-                sparse.cs_graph_components(distances + distances.T)
-            if len(np.unique(component_indicators)) > 1:
-                continue
-            distances.sort_indices()
-            forest = minimum_spanning_tree(distances)
-            _, inds = sparse.cs_graph_components(forest + forest.T)
-            assert(len(np.unique(inds)) == 1)
-            break
+        if self.verbose:
+            print("Datastructure used: %s" % self.nearest_neighbors_._fit_method)
+        if self.verbose:
+            print("Bulding minimum spanning tree.")
+        forest = euclidean_mst(X, self.nearest_neighbors_, verbose=self.verbose)
 
         # the dimensionality of the space can at most be n_samples
         if self.infer_dimensionality:
+            if self.verbose:
+                print("Estimating dimensionality.")
             intrinsic_dimensionality = estimate_dimension(
                 X, neighbors_estimator=self.nearest_neighbors_)
+            if self.verbose > 0:
+                print("Estimated dimensionality: %d" % intrinsic_dimensionality)
         elif n_samples < n_features:
             warnings.warn("Got dataset with n_samples < n_features. Setting"
                           "intrinsic dimensionality to n_samples. This is most"
@@ -96,6 +92,8 @@ class ITM(BaseEstimator, ClusterMixin):
         else:
             intrinsic_dimensionality = n_features
 
+        if self.verbose:
+            print("Cutting spanning tree.")
         clusters = [(forest, np.arange(n_samples))]
         cut_improvement = [itm_binary(forest.copy(), intrinsic_dimensionality,
                                       return_edge=True)]
@@ -106,6 +104,8 @@ class ITM(BaseEstimator, ClusterMixin):
         removed_edges = []
         # keep all possible next splits, pick the one with highest gain.
         while len(clusters) < self.n_clusters:
+            if self.verbose > 1:
+                print("Finding for split %d." % len(clusters))
             possible_improvements = (np.array([cut_i[1] * cut_i[0].shape[0] for
                                                cut_i in cut_improvement]) -
                                      np.array(cluster_infos))
