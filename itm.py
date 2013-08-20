@@ -204,7 +204,7 @@ def itm_binary(graph, intrinsic_dimensionality, return_edge=False):
 
     # from root back to leaves
     # declare last visited node as "root"
-
+    root = [x]
     to_visit = [x]
     parent = np.zeros(n_samples, dtype=np.int)
     parent[x] = -1
@@ -219,9 +219,7 @@ def itm_binary(graph, intrinsic_dimensionality, return_edge=False):
         for i in xrange(indptr[x], indptr[x + 1]):
             n = neighbors[i]
             if n != parent[x]:
-                incoming_down[n] += (incoming_down[x] + distances[i] +
-                                     incoming_up_accumulated[x] -
-                                     incoming_up[x, n])
+                incoming_down[n] += incoming_up_accumulated[root] - incoming_up_accumulated[n]
                 parent[n] = x
                 to_visit.append(n)
 
