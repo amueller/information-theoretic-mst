@@ -181,8 +181,7 @@ def itm_binary(graph, intrinsic_dimensionality, return_edge=False):
     # need this to see if all messages have arrived yet so we can go on
     up_message_count = indptr[1:] - indptr[:-1] - 1  # number of children
     visited = np.zeros(n_samples, dtype=np.bool)
-    incoming_up = sparse.lil_matrix((n_samples, n_samples))
-    incoming_up_accumulated = np.zeros(n_samples)
+    incoming_up = np.zeros(n_samples)
     leaves = np.where(up_message_count == 0)[0]
     nodes_below = np.zeros(n_samples, dtype=np.int)
     to_visit = leaves.tolist()
@@ -194,8 +193,7 @@ def itm_binary(graph, intrinsic_dimensionality, return_edge=False):
             if visited[n]:
                 #this is where we were coming from
                 continue
-            incoming_up[n, x] = incoming_up_accumulated[x] + distances[i]
-            incoming_up_accumulated[n] += incoming_up[n, x]
+            incoming_up[n] += incoming_up[x] + distances[i]
 
             nodes_below[n] += nodes_below[x] + 1
             up_message_count[n] -= 1
@@ -204,22 +202,21 @@ def itm_binary(graph, intrinsic_dimensionality, return_edge=False):
 
     # from root back to leaves
     # declare last visited node as "root"
+    # we only need that to know which one is the "parent" i.e. closer to the root
+    # we could alternatively first pick a root, then go down the tree, then go back up
+    # for the incoming_up.
     root = [x]
-    to_visit = [x]
     parent = np.zeros(n_samples, dtype=np.int)
     parent[x] = -1
+    to_visit = [x]
     visited = np.zeros(n_samples, dtype=np.bool)
-    incoming_down = np.zeros(graph_sym.shape[0])
 
-    #root to leave pass
-    # TODO refactor!!!
     while to_visit:
         x = to_visit.pop()
         visited[x] = True
         for i in xrange(indptr[x], indptr[x + 1]):
             n = neighbors[i]
             if n != parent[x]:
-                incoming_down[n] += incoming_up_accumulated[root] - incoming_up_accumulated[n]
                 parent[n] = x
                 to_visit.append(n)
 
@@ -231,10 +228,9 @@ def itm_binary(graph, intrinsic_dimensionality, return_edge=False):
             continue
         p = parent[x]
         # sum in parent part:
-        p_weights = float(incoming_down[p] + incoming_up_accumulated[p] -
-                          incoming_up_accumulated[x] - graph_sym[x, p])
+        p_weights = float(incoming_up[root] - incoming_up[x] - graph_sym[x, p])
         # sum in child part:
-        c_weights = float(incoming_up_accumulated[x])
+        c_weights = float(incoming_up[x])
         # nodes in child part:
         c_nodes = nodes_below[x] + 1  # count self
         if c_nodes <= 2:
