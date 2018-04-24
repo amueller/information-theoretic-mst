@@ -1,7 +1,5 @@
 import numpy as np
-from scipy import sparse
-
-from scipy.sparse.csgraph import minimum_spanning_tree
+from scipy.sparse.csgraph import minimum_spanning_tree, connected_components
 
 
 def euclidean_mst(X, neighbors_estimator, verbose=2):
@@ -15,12 +13,12 @@ def euclidean_mst(X, neighbors_estimator, verbose=2):
         distances = neighbors_estimator.kneighbors_graph(
             X, n_neighbors=n_neighbors, mode='distance')
         n_components, component_indicators =\
-            sparse.cs_graph_components(distances + distances.T)
+            connected_components(distances + distances.T)
         if len(np.unique(component_indicators)) > 1:
             continue
         distances.sort_indices()
         forest = minimum_spanning_tree(distances)
-        _, inds = sparse.cs_graph_components(forest + forest.T)
+        _, inds = connected_components(forest + forest.T)
         assert(len(np.unique(inds)) == 1)
         break
     return forest

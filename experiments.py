@@ -2,20 +2,14 @@ import numpy as np
 from time import time
 
 from sklearn.metrics import adjusted_rand_score, adjusted_mutual_info_score
-from sklearn.cluster import KMeans, Ward
+from sklearn.cluster import KMeans, AgglomerativeClustering
 
 # Normalized mutual information is only available
 # in the current development version. See if we can import,
 # otherwise use dummy.
 
-normalized_mutual_info_score = lambda x, y: np.NaN
-try:
-    from sklearn.metrics import normalized_mutual_info_score
-except ImportError:
-    pass
+from sklearn.metrics import normalized_mutual_info_score
 
-#from heuristics import cut_biggest
-#from mean_nn import mean_nn
 from tree_entropy import tree_information
 from itm import ITM
 
@@ -41,7 +35,8 @@ def do_experiments(dataset):
 
     classes = [ITM(n_clusters=n_clusters),
                ITM(n_clusters=n_clusters, infer_dimensionality=True),
-               Ward(n_clusters=n_clusters), KMeans(n_clusters=n_clusters)]
+               AgglomerativeClustering(linkage='ward', n_clusters=n_clusters),
+               KMeans(n_clusters=n_clusters)]
     names = ["ITM", "ITM ID", "Ward", "KMeans"]
     for clusterer, method in zip(classes, names):
         start = time()
@@ -73,7 +68,7 @@ if __name__ == "__main__":
     iris = datasets.load_iris()
     digits = datasets.load_digits()
 
-    #dataset_list = [iris, vehicle, vowel, digits, faces, usps, waveform]
-    dataset_list = [mnist]
+    dataset_list = [iris, vehicle, vowel]  # , digits, faces, usps, waveform]
+    # dataset_list = [mnist]
     for dataset in dataset_list:
         do_experiments(dataset)

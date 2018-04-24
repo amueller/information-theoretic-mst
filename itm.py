@@ -1,6 +1,7 @@
 import warnings
 
 from scipy import sparse
+from scipy.sparse.csgraph import connected_components
 import numpy as np
 
 from sklearn.base import BaseEstimator, ClusterMixin
@@ -123,7 +124,7 @@ class ITM(BaseEstimator, ClusterMixin):
             removed_edges.append((old_inds[list(edge[:2])], edge[2]))
 
             n_split_components, split_components_indicator = \
-                sparse.cs_graph_components(split + split.T)
+                connected_components(split + split.T)
             assert(n_split_components == 2)
             assert(len(np.unique(split_components_indicator)) == 2)
 
@@ -134,8 +135,8 @@ class ITM(BaseEstimator, ClusterMixin):
                 mi = tree_information_sparse(clusters[-1][0],
                                              intrinsic_dimensionality)
                 cluster_infos.append(mi)
-                imp = itm_binary(clusters[-1][0].copy(), intrinsic_dimensionality,
-                                 return_edge=True)
+                imp = itm_binary(clusters[-1][0].copy(),
+                                 intrinsic_dimensionality, return_edge=True)
                 cut_improvement.append(imp)
 
         # correspondence of nodes to datapoints not present in sparse matrices
@@ -150,8 +151,8 @@ class ITM(BaseEstimator, ClusterMixin):
         # for computing the objective, we don't care about the indices
         result = block_diag([c[0] for c in clusters], format='csr')
         self.labels_ = y
-        self.tree_information_ = (tree_information_sparse(result, intrinsic_dimensionality) /
-                                  n_samples)
+        self.tree_information_ = (tree_information_sparse(
+            result, intrinsic_dimensionality) / n_samples)
         return self
 
 
@@ -193,10 +194,10 @@ def itm_binary(graph, intrinsic_dimensionality, return_edge=False):
     while to_visit:
         x = to_visit.pop()
         visited[x] = True
-        for i in xrange(indptr[x], indptr[x + 1]):
+        for i in range(indptr[x], indptr[x + 1]):
             n = neighbors[i]
             if visited[n]:
-                #this is where we were coming from
+                # this is where we were coming from
                 continue
             incoming_up[n] += incoming_up[x] + distances[i]
 
@@ -207,9 +208,9 @@ def itm_binary(graph, intrinsic_dimensionality, return_edge=False):
 
     # from root back to leaves
     # declare last visited node as "root"
-    # we only need that to know which one is the "parent" i.e. closer to the root
-    # we could alternatively first pick a root, then go down the tree, then go back up
-    # for the incoming_up.
+    # we only need that to know which one is the "parent" i.e. closer to the
+    # root. We could alternatively first pick a root, then go down the tree,
+    # then go back up for the incoming_up.
     root = [x]
     parent = np.zeros(n_samples, dtype=np.int)
     parent[x] = -1
@@ -219,7 +220,7 @@ def itm_binary(graph, intrinsic_dimensionality, return_edge=False):
     while to_visit:
         x = to_visit.pop()
         visited[x] = True
-        for i in xrange(indptr[x], indptr[x + 1]):
+        for i in range(indptr[x], indptr[x + 1]):
             n = neighbors[i]
             if n != parent[x]:
                 parent[n] = x
@@ -227,7 +228,7 @@ def itm_binary(graph, intrinsic_dimensionality, return_edge=False):
 
     best_cut = None
     best_objective = -np.inf
-    for x in xrange(n_samples):
+    for x in range(n_samples):
         if parent[x] == -1:
             # was the root, doesn't have parent
             continue
@@ -247,9 +248,11 @@ def itm_binary(graph, intrinsic_dimensionality, return_edge=False):
             continue
 
         assert(p_weights > 0)
-        objective = (p_nodes * ((intrinsic_dimensionality - 1) * np.log(p_nodes)
+        objective = (p_nodes * ((intrinsic_dimensionality - 1) *
+                                np.log(p_nodes)
                      - intrinsic_dimensionality * np.log(p_weights)))
-        objective += (c_nodes * ((intrinsic_dimensionality - 1) * np.log(c_nodes)
+        objective += (c_nodes * ((intrinsic_dimensionality - 1) *
+                                 np.log(c_nodes)
                       - intrinsic_dimensionality * np.log(c_weights)))
         if objective > best_objective:
             best_cut = x
