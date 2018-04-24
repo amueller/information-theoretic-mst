@@ -3,7 +3,7 @@ import warnings
 
 from scipy import sparse
 
-from sklearn.utils.sparsetools import minimum_spanning_tree
+from scipy.sparse.csgraph import minimum_spanning_tree
 from sklearn.metrics import euclidean_distances
 
 
@@ -30,7 +30,7 @@ def tree_information(X, y):
         L = spanning_tree_length(X_)
         if L == 0:
             warnings.warn("L is zero. This means there are identical points in"
-                    "the dataset")
+                          "the dataset")
             L = 1e-10
         entropy += n_samples_c * ((n_features - 1) * np.log(n_samples_c) -
                                   n_features * np.log(L))
@@ -65,17 +65,17 @@ def tree_information_sparse(forest, n_features):
     if np.any(components < 0):
         # there is a lonely node
         entropy -= 1e10
-    #n_samples = len(components)
+    # n_samples = len(components)
 
-    for i in xrange(n_components):
+    for i in range(n_components):
         inds = np.where(components == i)[0]
         subforest = forest[inds[:, np.newaxis], inds]
         L = subforest.sum()
         n_samples_c = len(inds)
         if L == 0:
             warnings.warn("L is zero. This means there are identical points in"
-                    " the dataset")
+                          " the dataset")
             L = 1e-10
         entropy += (n_samples_c * ((n_features - 1) * np.log(n_samples_c) -
-            n_features * np.log(L)))
+                                   n_features * np.log(L)))
     return entropy

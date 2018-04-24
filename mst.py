@@ -1,7 +1,7 @@
 import numpy as np
 from scipy import sparse
 
-from sklearn.utils.sparsetools import minimum_spanning_tree
+from scipy.sparse.csgraph import minimum_spanning_tree
 
 
 def euclidean_mst(X, neighbors_estimator, verbose=2):

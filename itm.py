@@ -27,9 +27,9 @@ class ITM(BaseEstimator, ClusterMixin):
     n_clusters : int, default=None
         Number of clusters the data is split into.
 
-    infer_dimensionality : bool, default=False
-        Whether to infer the dimensionality using a dimension estimation method.
-        If False, the input dimensionality will be used.
+    infer_dimensionality : bool, default=True
+        Whether to infer the dimensionality using a dimension estimation
+        method.  If False, the input dimensionality will be used.
 
     nearest_neighbor_algorithm : bool, default='auto'
         Nearest neighbor data structure used for distance queries.
@@ -45,7 +45,7 @@ class ITM(BaseEstimator, ClusterMixin):
         Cluster labels
 
     """
-    def __init__(self, n_clusters=2, infer_dimensionality=False,
+    def __init__(self, n_clusters=2, infer_dimensionality=True,
                  nearest_neighbor_algorithm='auto', verbose=0):
         self.n_clusters = n_clusters
         self.infer_dimensionality = infer_dimensionality
@@ -65,15 +65,18 @@ class ITM(BaseEstimator, ClusterMixin):
         """
         n_samples, n_features = X.shape
 
-        self.nearest_neighbors_ = NearestNeighbors(algorithm=self.nearest_neighbor_algorithm)
+        self.nearest_neighbors_ = NearestNeighbors(
+            algorithm=self.nearest_neighbor_algorithm)
         if self.verbose:
             print("Fitting neighbors data structure.")
         self.nearest_neighbors_.fit(X)
         if self.verbose:
-            print("Datastructure used: %s" % self.nearest_neighbors_._fit_method)
+            print("Datastructure used: %s" %
+                  self.nearest_neighbors_._fit_method)
         if self.verbose:
             print("Bulding minimum spanning tree.")
-        forest = euclidean_mst(X, self.nearest_neighbors_, verbose=self.verbose)
+        forest = euclidean_mst(X, self.nearest_neighbors_,
+                               verbose=self.verbose)
 
         # the dimensionality of the space can at most be n_samples
         if self.infer_dimensionality:
@@ -82,12 +85,13 @@ class ITM(BaseEstimator, ClusterMixin):
             intrinsic_dimensionality = estimate_dimension(
                 X, neighbors_estimator=self.nearest_neighbors_)
             if self.verbose > 0:
-                print("Estimated dimensionality: %d" % intrinsic_dimensionality)
+                print("Estimated dimensionality: %d" %
+                      intrinsic_dimensionality)
         elif n_samples < n_features:
             warnings.warn("Got dataset with n_samples < n_features. Setting"
                           "intrinsic dimensionality to n_samples. This is most"
-                          " likely to high, leading to uneven clusters."
-                          " It is recommendet to set infer_dimensionality=True.")
+                          " likely to high, leading to uneven clusters. It "
+                          "is recommendet to set infer_dimensionality=True.")
             intrinsic_dimensionality = n_samples
         else:
             intrinsic_dimensionality = n_features
@@ -123,11 +127,12 @@ class ITM(BaseEstimator, ClusterMixin):
             assert(n_split_components == 2)
             assert(len(np.unique(split_components_indicator)) == 2)
 
-            for i in xrange(n_split_components):
+            for i in range(n_split_components):
                 inds = np.where(split_components_indicator == i)[0]
                 clusters.append((split[inds[np.newaxis, :], inds],
                                  old_inds[inds]))
-                mi = tree_information_sparse(clusters[-1][0], intrinsic_dimensionality)
+                mi = tree_information_sparse(clusters[-1][0],
+                                             intrinsic_dimensionality)
                 cluster_infos.append(mi)
                 imp = itm_binary(clusters[-1][0].copy(), intrinsic_dimensionality,
                                  return_edge=True)

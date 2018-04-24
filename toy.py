@@ -1,7 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-from itm import itm
+from itm import ITM
 from heuristics import cut_biggest
 from plot_clustering import plot_clustering
 from mean_nn import mean_nn
