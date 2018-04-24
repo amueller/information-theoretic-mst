@@ -1,9 +1,7 @@
 import numpy as np
 import warnings
 
-from scipy import sparse
-
-from scipy.sparse.csgraph import minimum_spanning_tree
+from scipy.sparse.csgraph import minimum_spanning_tree, connected_components
 from sklearn.metrics import euclidean_distances
 
 
@@ -61,7 +59,7 @@ def tree_information_sparse(forest, n_features):
     """
     entropy = 0
     sym_forest = forest + forest.T
-    n_components, components = sparse.cs_graph_components(sym_forest)
+    n_components, components = connected_components(sym_forest)
     if np.any(components < 0):
         # there is a lonely node
         entropy -= 1e10

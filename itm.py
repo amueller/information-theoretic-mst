@@ -1,6 +1,5 @@
 import warnings
 
-from scipy import sparse
 from scipy.sparse.csgraph import connected_components
 import numpy as np
 
@@ -130,7 +129,7 @@ class ITM(BaseEstimator, ClusterMixin):
 
             for i in range(n_split_components):
                 inds = np.where(split_components_indicator == i)[0]
-                clusters.append((split[inds[np.newaxis, :], inds],
+                clusters.append((split[inds, :][:, inds],
                                  old_inds[inds]))
                 mi = tree_information_sparse(clusters[-1][0],
                                              intrinsic_dimensionality)
