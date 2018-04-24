@@ -1,6 +1,7 @@
 import warnings
 
 from scipy.sparse.csgraph import connected_components
+from scipy.sparse.base import SparseEfficiencyWarning
 import numpy as np
 
 from sklearn.base import BaseEstimator, ClusterMixin
@@ -259,8 +260,11 @@ def itm_binary(graph, intrinsic_dimensionality, return_edge=False):
     if best_cut is None:
         return graph, -np.inf
     best_objective /= n_samples
-    graph[best_cut, parent[best_cut]] = 0
-    graph[parent[best_cut], best_cut] = 0
+    with warnings.catch_warnings():
+        # catch sparse efficiency warning for setting elements in CSR
+        warnings.simplefilter('ignore', SparseEfficiencyWarning)
+        graph[best_cut, parent[best_cut]] = 0
+        graph[parent[best_cut], best_cut] = 0
 
     if return_edge:
         weight_best_cut = graph_sym[best_cut, parent[best_cut]]

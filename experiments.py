@@ -13,6 +13,7 @@ from sklearn.metrics import normalized_mutual_info_score
 from tree_entropy import tree_information
 from itm import ITM
 
+import warnings
 
 def do_experiments(dataset):
     X, y = dataset.data, dataset.target
@@ -33,7 +34,7 @@ def do_experiments(dataset):
           (dataset_name, X.shape[0], X.shape[1], n_clusters))
     print("=" * 70)
 
-    classes = [ITM(n_clusters=n_clusters),
+    classes = [ITM(n_clusters=n_clusters, infer_dimensionality=False),
                ITM(n_clusters=n_clusters, infer_dimensionality=True),
                AgglomerativeClustering(linkage='ward', n_clusters=n_clusters),
                KMeans(n_clusters=n_clusters)]
